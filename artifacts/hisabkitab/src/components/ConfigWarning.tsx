@@ -1,11 +1,15 @@
+import logoUrl from "@assets/Black_White_Minimalist_Elegant_Monogram_Initial_Logo_20260425__1777135391206.png";
+
 export function ConfigWarning() {
   return (
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-6">
       <div className="max-w-xl w-full bg-white rounded-2xl shadow-md border border-emerald-100 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-            H
-          </div>
+          <img
+            src={logoUrl}
+            alt="HisabKitab"
+            className="h-10 w-10 rounded-full object-cover"
+          />
           <h1 className="text-2xl font-bold text-emerald-700">
             Connect Firebase to start
           </h1>
