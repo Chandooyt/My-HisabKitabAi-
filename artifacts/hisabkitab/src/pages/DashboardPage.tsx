@@ -3,6 +3,7 @@ import { Logo } from "@/components/Logo";
 import { AdBanner } from "@/components/AdBanner";
 import { AddExpenseDialog } from "@/components/AddExpenseDialog";
 import { BudgetDialog } from "@/components/BudgetDialog";
+import { ReminderDialog } from "@/components/ReminderDialog";
 import { useAuth } from "@/firebase/auth";
 import {
   subscribeBudget,
@@ -23,6 +24,12 @@ import {
   showLocalNotification,
 } from "@/firebase/messaging";
 import { VAPID_KEY } from "@/firebase/config";
+import {
+  fireOnce,
+  getReminderTime,
+  getRemindersEnabled,
+  scheduleDailyReminder,
+} from "@/lib/notifications";
 
 export function DashboardPage() {
   const { user, logOut } = useAuth();
@@ -31,12 +38,12 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     typeof Notification !== "undefined"
       ? Notification.permission
       : "unsupported",
   );
-  const [alertedToday, setAlertedToday] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -84,14 +91,69 @@ export function DashboardPage() {
   }, [budget.daily, todayTotal]);
 
   useEffect(() => {
-    if (budgetStatus === "over" && !alertedToday) {
-      setAlertedToday(true);
-      showLocalNotification(
-        "Budget alert",
-        `You crossed today's budget of ${formatRupees(budget.daily ?? 0)}.`,
+    if (!user || permission !== "granted") return;
+    if (!budget.daily) return;
+    const ratio = todayTotal / budget.daily;
+    if (ratio >= 1) {
+      fireOnce(
+        user.uid,
+        "daily-over",
+        "Budget crossed",
+        `You crossed today's budget of ${formatRupees(budget.daily)}. Spent ${formatRupees(todayTotal)}.`,
+      );
+    } else if (ratio >= 0.8) {
+      fireOnce(
+        user.uid,
+        "daily-warn",
+        "Budget warning",
+        `You've used ${Math.round(ratio * 100)}% of today's ${formatRupees(budget.daily)} budget.`,
       );
     }
-  }, [budgetStatus, alertedToday, budget.daily]);
+  }, [user, permission, budget.daily, todayTotal]);
+
+  useEffect(() => {
+    if (!user || permission !== "granted") return;
+    const cats = Object.entries(budget.perCategory);
+    if (cats.length === 0) return;
+    for (const [cat, limit] of cats) {
+      if (!limit || limit <= 0) continue;
+      const spent = todayExpenses
+        .filter((e) => e.category === cat)
+        .reduce((a, e) => a + e.amount, 0);
+      const ratio = spent / limit;
+      if (ratio >= 1) {
+        fireOnce(
+          user.uid,
+          `cat-over-${cat}`,
+          `${cat} budget crossed`,
+          `Spent ${formatRupees(spent)} on ${cat} (limit ${formatRupees(limit)}).`,
+        );
+      } else if (ratio >= 0.8) {
+        fireOnce(
+          user.uid,
+          `cat-warn-${cat}`,
+          `${cat} nearing limit`,
+          `${Math.round(ratio * 100)}% of your ${cat} budget used (${formatRupees(spent)} of ${formatRupees(limit)}).`,
+        );
+      }
+    }
+  }, [user, permission, budget.perCategory, todayExpenses]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (permission !== "granted") return;
+    if (!getRemindersEnabled(user.uid)) return;
+    const time = getReminderTime(user.uid);
+    const cancel = scheduleDailyReminder(user.uid, time, () => {
+      const total = todayExpenses.reduce((a, e) => a + e.amount, 0);
+      const body =
+        total > 0
+          ? `You've logged ${formatRupees(total)} today. Anything left to add?`
+          : "Don't forget to log today's expenses in HisabKitab.";
+      fireOnce(user.uid, "daily-reminder", "Daily reminder", body);
+    });
+    return cancel;
+  }, [user, permission, todayExpenses, showReminder]);
 
   const askPermission = async () => {
     const result = await requestNotificationPermission();
@@ -120,16 +182,17 @@ export function DashboardPage() {
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-2">
-            {permission !== "granted" && permission !== "unsupported" && (
-              <button
-                type="button"
-                onClick={askPermission}
-                className="hidden sm:inline-flex text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-2"
-                data-testid="button-enable-notifications"
-              >
-                Enable reminders
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowReminder(true)}
+              className="text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-2 inline-flex items-center gap-1"
+              data-testid="button-reminder-settings"
+              aria-label="Reminder settings"
+              title="Reminder settings"
+            >
+              <span aria-hidden>🔔</span>
+              <span className="hidden sm:inline">Reminders</span>
+            </button>
             <button
               type="button"
               onClick={() => logOut()}
@@ -346,28 +409,37 @@ export function DashboardPage() {
 
         {permission === "default" && (
           <section className="bg-emerald-600 text-white rounded-2xl shadow-sm p-5 mt-4">
-            <p className="font-semibold">Get daily reminders</p>
+            <p className="font-semibold">Turn on push notifications</p>
             <p className="text-sm text-emerald-50 mt-1">
-              Turn on notifications so HisabKitab can remind you to log your
-              spending.
+              Get daily reminders, budget warnings, and alerts when you cross
+              your spending limits.
               {!VAPID_KEY && (
                 <>
                   {" "}
                   <span className="block mt-1 text-emerald-100/90 text-xs">
-                    Tip: add a VAPID key in your .env to enable Firebase Cloud
-                    Messaging too.
+                    Tip: add a VAPID key in your .env to also enable Firebase
+                    Cloud Messaging from a server.
                   </span>
                 </>
               )}
             </p>
-            <button
-              type="button"
-              onClick={askPermission}
-              className="mt-3 bg-white text-emerald-700 font-semibold rounded-lg px-4 py-2"
-              data-testid="button-enable-notifications-card"
-            >
-              Enable
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={askPermission}
+                className="bg-white text-emerald-700 font-semibold rounded-lg px-4 py-2"
+                data-testid="button-enable-notifications-card"
+              >
+                Enable
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReminder(true)}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg px-4 py-2 border border-emerald-500"
+              >
+                Reminder settings
+              </button>
+            </div>
           </section>
         )}
 
@@ -390,6 +462,13 @@ export function DashboardPage() {
         onClose={() => setShowBudget(false)}
         current={budget}
       />
+      {user && (
+        <ReminderDialog
+          open={showReminder}
+          onClose={() => setShowReminder(false)}
+          uid={user.uid}
+        />
+      )}
     </div>
   );
 }
