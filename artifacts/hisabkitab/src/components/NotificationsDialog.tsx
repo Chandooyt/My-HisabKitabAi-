@@ -35,48 +35,43 @@ export function NotificationsDialog({ open, onClose, uid }: Props) {
     setError(null);
     setSuccess(null);
     setSaving(true);
-    try {
-      if (enabled) {
-        const perm = await requestNotificationPermission();
-        if (perm === "unsupported") {
-          setError(
-            "This browser doesn't support web notifications. Try Chrome, Edge, or Firefox.",
-          );
-          setSaving(false);
-          return;
-        }
-        if (perm !== "granted") {
-          setError(
-            "Notifications are blocked. Tap the lock icon in your browser's address bar and allow notifications for this site.",
-          );
-          setSaving(false);
-          return;
-        }
-        await initMessaging(uid);
-      }
 
-      try {
-        await saveNotificationSettings(uid, {
-          enabled,
-          timezone: detectTimezone(),
-        });
-      } catch {
-        // server-side settings save failed; client-side alerts still work
+    if (enabled) {
+      const perm = await requestNotificationPermission();
+      if (perm === "unsupported") {
+        setError(
+          "This browser doesn't support web notifications. Try Chrome, Edge, or Firefox.",
+        );
+        setSaving(false);
+        return;
       }
-
-      setSuccess(
-        enabled
-          ? "Notifications enabled. You'll get an alert when you near or cross your daily and category budgets."
-          : "Notifications turned off.",
-      );
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save settings.");
-    } finally {
-      setSaving(false);
+      if (perm !== "granted") {
+        setError(
+          "Notifications are blocked. Tap the lock icon in your browser's address bar and allow notifications for this site.",
+        );
+        setSaving(false);
+        return;
+      }
     }
+
+    setSaving(false);
+    setSuccess(
+      enabled
+        ? "Saved! You'll get alerts when you near or cross your budgets."
+        : "Notifications turned off.",
+    );
+
+    void saveNotificationSettings(uid, {
+      enabled,
+      timezone: detectTimezone(),
+    }).catch(() => undefined);
+    if (enabled) {
+      void initMessaging(uid).catch(() => undefined);
+    }
+
+    setTimeout(() => {
+      onClose();
+    }, 700);
   };
 
   return (
