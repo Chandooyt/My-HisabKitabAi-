@@ -8,7 +8,6 @@ import { getDbInstance } from "./config";
 
 export type NotificationSettings = {
   enabled: boolean;
-  reminderTime: string;
   timezone: string;
 };
 
@@ -23,7 +22,6 @@ export const saveNotificationSettings = async (
     settingsDoc(uid),
     {
       enabled: settings.enabled,
-      reminderTime: settings.reminderTime,
       timezone: settings.timezone,
       updatedAt: serverTimestamp(),
     },

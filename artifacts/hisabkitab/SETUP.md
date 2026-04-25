@@ -92,21 +92,19 @@ firebase use hisabkitab-5db94    # or your own project ID
 firebase deploy --only functions,firestore:rules
 ```
 
-This deploys two functions:
+This deploys one function:
 
-- **`dailyReminder`** — runs every 15 minutes; sends each user their daily
-  reminder push at the time they picked (in their own timezone).
-- **`onExpenseCreated`** — runs when a new expense is added; sends push
-  warnings at 80% of the daily / category budget and an alert when crossed.
+- **`onExpenseCreated`** — runs when a new expense is added; sends a push
+  warning at 80% of the daily / category budget and an alert when crossed.
 
 ### How the client connects
 
-When users tap **🔔 Reminders**, enable notifications, and save, the app:
+When users tap **🔔 Alerts**, enable notifications, and save, the app:
 
 - Stores their FCM web push token under
   `users/{uid}/settings/notifications.fcmTokens`
-- Stores their reminder preferences (enabled, time, timezone) in the same doc
-- The deployed functions read these and send push messages to those tokens.
+- Stores enabled flag and timezone in the same doc
+- The deployed function reads these and sends push messages to those tokens.
 
 Tokens that become invalid (uninstalled / cleared browsers) are pruned
 automatically by the function.

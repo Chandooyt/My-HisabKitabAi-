@@ -3,7 +3,7 @@ import { Logo } from "@/components/Logo";
 import { AdBanner } from "@/components/AdBanner";
 import { AddExpenseDialog } from "@/components/AddExpenseDialog";
 import { BudgetDialog } from "@/components/BudgetDialog";
-import { ReminderDialog } from "@/components/ReminderDialog";
+import { NotificationsDialog } from "@/components/NotificationsDialog";
 import { useAuth } from "@/firebase/auth";
 import {
   subscribeBudget,
@@ -24,12 +24,7 @@ import {
   showLocalNotification,
 } from "@/firebase/messaging";
 import { VAPID_KEY } from "@/firebase/config";
-import {
-  fireOnce,
-  getReminderTime,
-  getRemindersEnabled,
-  scheduleDailyReminder,
-} from "@/lib/notifications";
+import { fireOnce } from "@/lib/notifications";
 
 export function DashboardPage() {
   const { user, logOut } = useAuth();
@@ -38,7 +33,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
-  const [showReminder, setShowReminder] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     typeof Notification !== "undefined"
       ? Notification.permission
@@ -139,22 +134,6 @@ export function DashboardPage() {
     }
   }, [user, permission, budget.perCategory, todayExpenses]);
 
-  useEffect(() => {
-    if (!user) return;
-    if (permission !== "granted") return;
-    if (!getRemindersEnabled(user.uid)) return;
-    const time = getReminderTime(user.uid);
-    const cancel = scheduleDailyReminder(user.uid, time, () => {
-      const total = todayExpenses.reduce((a, e) => a + e.amount, 0);
-      const body =
-        total > 0
-          ? `You've logged ${formatRupees(total)} today. Anything left to add?`
-          : "Don't forget to log today's expenses in HisabKitab.";
-      fireOnce(user.uid, "daily-reminder", "Daily reminder", body);
-    });
-    return cancel;
-  }, [user, permission, todayExpenses, showReminder]);
-
   const askPermission = async () => {
     const result = await requestNotificationPermission();
     if (result === "unsupported") {
@@ -184,14 +163,14 @@ export function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowReminder(true)}
+              onClick={() => setShowNotifications(true)}
               className="text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-2 inline-flex items-center gap-1"
-              data-testid="button-reminder-settings"
-              aria-label="Reminder settings"
-              title="Reminder settings"
+              data-testid="button-notification-settings"
+              aria-label="Notification settings"
+              title="Notification settings"
             >
               <span aria-hidden>🔔</span>
-              <span className="hidden sm:inline">Reminders</span>
+              <span className="hidden sm:inline">Alerts</span>
             </button>
             <button
               type="button"
@@ -409,10 +388,10 @@ export function DashboardPage() {
 
         {permission === "default" && (
           <section className="bg-emerald-600 text-white rounded-2xl shadow-sm p-5 mt-4">
-            <p className="font-semibold">Turn on push notifications</p>
+            <p className="font-semibold">Turn on budget alerts</p>
             <p className="text-sm text-emerald-50 mt-1">
-              Get daily reminders, budget warnings, and alerts when you cross
-              your spending limits.
+              Get a warning when you reach 80% of a budget and an alert when
+              you cross it — for both your daily limit and any category limits.
               {!VAPID_KEY && (
                 <>
                   {" "}
@@ -423,7 +402,7 @@ export function DashboardPage() {
                 </>
               )}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3">
               <button
                 type="button"
                 onClick={askPermission}
@@ -431,13 +410,6 @@ export function DashboardPage() {
                 data-testid="button-enable-notifications-card"
               >
                 Enable
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowReminder(true)}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg px-4 py-2 border border-emerald-500"
-              >
-                Reminder settings
               </button>
             </div>
           </section>
@@ -463,9 +435,9 @@ export function DashboardPage() {
         current={budget}
       />
       {user && (
-        <ReminderDialog
-          open={showReminder}
-          onClose={() => setShowReminder(false)}
+        <NotificationsDialog
+          open={showNotifications}
+          onClose={() => setShowNotifications(false)}
           uid={user.uid}
         />
       )}

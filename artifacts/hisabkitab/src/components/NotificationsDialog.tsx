@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  getReminderTime,
-  getRemindersEnabled,
-  setReminderTime,
-  setRemindersEnabled,
-} from "@/lib/notifications";
-import {
   initMessaging,
   requestNotificationPermission,
-  showLocalNotification,
 } from "@/firebase/messaging";
 import {
   detectTimezone,
@@ -21,8 +14,7 @@ type Props = {
   uid: string;
 };
 
-export function ReminderDialog({ open, onClose, uid }: Props) {
-  const [time, setTime] = useState("21:00");
+export function NotificationsDialog({ open, onClose, uid }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,21 +22,14 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setTime(getReminderTime(uid));
-    setEnabled(getRemindersEnabled(uid));
+    const perm =
+      typeof Notification !== "undefined" ? Notification.permission : "default";
+    setEnabled(perm === "granted");
     setError(null);
     setSuccess(null);
-  }, [open, uid]);
+  }, [open]);
 
   if (!open) return null;
-
-  const formatTimeLabel = (hhmm: string): string => {
-    const [h, m] = hhmm.split(":").map(Number);
-    if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
-    const hour12 = ((h + 11) % 12) + 1;
-    const ampm = h < 12 ? "AM" : "PM";
-    return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
-  };
 
   const handleSave = async () => {
     setError(null);
@@ -70,33 +55,23 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
         await initMessaging(uid);
       }
 
-      setReminderTime(uid, time);
-      setRemindersEnabled(uid, enabled);
       try {
         await saveNotificationSettings(uid, {
           enabled,
-          reminderTime: time,
           timezone: detectTimezone(),
         });
       } catch {
-        // server-side settings save failed; local reminders still work
+        // server-side settings save failed; client-side alerts still work
       }
 
-      if (enabled) {
-        showLocalNotification(
-          "Reminders are on",
-          `We'll send a daily nudge at ${formatTimeLabel(time)}.`,
-        );
-        setSuccess(
-          `Saved. You'll get a daily reminder at ${formatTimeLabel(time)}, plus alerts when you near or cross your budgets. A test notification should appear now.`,
-        );
-      } else {
-        setSuccess("Reminders turned off.");
-      }
-
+      setSuccess(
+        enabled
+          ? "Notifications enabled. You'll get an alert when you near or cross your daily and category budgets."
+          : "Notifications turned off.",
+      );
       setTimeout(() => {
         onClose();
-      }, 1800);
+      }, 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save settings.");
     } finally {
@@ -114,9 +89,7 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-emerald-700">
-            Reminder settings
-          </h2>
+          <h2 className="text-lg font-bold text-emerald-700">Notifications</h2>
           <button
             type="button"
             onClick={onClose}
@@ -128,46 +101,27 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
         </div>
 
         <p className="text-sm text-gray-600 mb-4">
-          Get push notifications for daily reminders, budget warnings, and when
-          you cross your limits.
+          Get an alert when you reach 80% of a budget and another when you cross
+          it — for both your daily limit and any category limits you've set.
         </p>
 
-        <label className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-4">
+        <label className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
           <span className="font-semibold text-emerald-700">
-            Enable notifications
+            Enable budget alerts
           </span>
           <input
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
             className="h-5 w-5 accent-emerald-600"
-            data-testid="toggle-reminders-enabled"
+            data-testid="toggle-notifications-enabled"
           />
         </label>
-
-        <div className="mb-2">
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Daily reminder time
-          </label>
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            disabled={!enabled}
-            className="w-full rounded-lg border border-gray-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-50 disabled:text-gray-400"
-            data-testid="input-reminder-time"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            We'll remind you to log your spending at this time each day. Keep
-            HisabKitab open in a tab to receive reminders even if your phone is
-            locked.
-          </p>
-        </div>
 
         {error && (
           <div
             className="mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3"
-            data-testid="text-reminder-error"
+            data-testid="text-notification-error"
           >
             {error}
           </div>
@@ -176,7 +130,7 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
         {success && (
           <div
             className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg p-3"
-            data-testid="text-reminder-success"
+            data-testid="text-notification-success"
           >
             {success}
           </div>
@@ -195,7 +149,7 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
             onClick={handleSave}
             disabled={saving}
             className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold rounded-lg py-3 shadow-sm"
-            data-testid="button-save-reminder"
+            data-testid="button-save-notifications"
           >
             {saving ? "Saving..." : "Save"}
           </button>

@@ -1,4 +1,3 @@
-import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
@@ -9,10 +8,8 @@ initializeApp();
 
 type NotificationSettings = {
   enabled?: boolean;
-  reminderTime?: string;
   timezone?: string;
   fcmTokens?: Record<string, boolean>;
-  lastReminderDate?: string;
 };
 
 type Budget = {
@@ -37,27 +34,6 @@ const localDateKey = (timezone: string): string => {
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
-};
-
-const localHHMM = (timezone: string): string => {
-  try {
-    const fmt = new Intl.DateTimeFormat("en-GB", {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    return fmt.format(new Date());
-  } catch {
-    const d = new Date();
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-};
-
-const minutesBetween = (a: string, b: string): number => {
-  const [ah, am] = a.split(":").map(Number);
-  const [bh, bm] = b.split(":").map(Number);
-  return Math.abs(ah * 60 + am - (bh * 60 + bm));
 };
 
 const sendToTokens = async (
@@ -103,51 +79,6 @@ const sendToTokens = async (
   });
   await Promise.all(cleanups);
 };
-
-export const dailyReminder = onSchedule(
-  { schedule: "every 15 minutes", timeZone: "UTC", region: "us-central1" },
-  async () => {
-    const db = getFirestore();
-    const snap = await db
-      .collectionGroup("settings")
-      .where("enabled", "==", true)
-      .get();
-
-    let sent = 0;
-    for (const doc of snap.docs) {
-      if (doc.id !== "notifications") continue;
-      const settings = doc.data() as NotificationSettings;
-      const uid = doc.ref.parent.parent?.id;
-      if (!uid) continue;
-
-      const enabled = settings.enabled === true;
-      const reminderTime = settings.reminderTime ?? "21:00";
-      const timezone = settings.timezone ?? "UTC";
-      const tokens = Object.keys(settings.fcmTokens ?? {});
-      if (!enabled || tokens.length === 0) continue;
-
-      const today = localDateKey(timezone);
-      if (settings.lastReminderDate === today) continue;
-
-      const now = localHHMM(timezone);
-      if (minutesBetween(now, reminderTime) > 7) continue;
-
-      try {
-        await sendToTokens(
-          uid,
-          tokens,
-          "HisabKitab daily reminder",
-          "Don't forget to log today's expenses.",
-        );
-        await doc.ref.update({ lastReminderDate: today });
-        sent++;
-      } catch (err) {
-        logger.error("Reminder send failed", { uid, err });
-      }
-    }
-    logger.info("Daily reminder run complete", { sent, scanned: snap.size });
-  },
-);
 
 const startOfTodayMs = (timezone: string): number => {
   try {
