@@ -11,12 +11,12 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyANVP33CBfVa7dZ_2ssR0uF5jCqC0dGMGk",
+  authDomain: "hisabkitab-5db94.firebaseapp.com",
+  projectId: "hisabkitab-5db94",
+  storageBucket: "hisabkitab-5db94.firebasestorage.app",
+  messagingSenderId: "785345266180",
+  appId: "1:785345266180:web:bf18ea5402f67a9dbb6b51",
 });
 
 const messaging = firebase.messaging();
