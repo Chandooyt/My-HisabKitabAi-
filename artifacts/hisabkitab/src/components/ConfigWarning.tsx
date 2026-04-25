@@ -1,4 +1,4 @@
-import logoUrl from "@assets/Black_White_Minimalist_Elegant_Monogram_Initial_Logo_20260425__1777135391206.png";
+import logoUrl from "@assets/file_0000000036647208be29fa4d970126e5_1777136350500.png";
 
 export function ConfigWarning() {
   return (
@@ -8,7 +8,7 @@ export function ConfigWarning() {
           <img
             src={logoUrl}
             alt="HisabKitab"
-            className="h-10 w-10 rounded-full object-cover"
+            className="h-10 w-10 rounded-xl object-cover"
           />
           <h1 className="text-2xl font-bold text-emerald-700">
             Connect Firebase to start

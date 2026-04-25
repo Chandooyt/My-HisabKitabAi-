@@ -1,4 +1,4 @@
-import logoUrl from "@assets/Black_White_Minimalist_Elegant_Monogram_Initial_Logo_20260425__1777135391206.png";
+import logoUrl from "@assets/file_0000000036647208be29fa4d970126e5_1777136350500.png";
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
@@ -6,7 +6,7 @@ export function Logo({ className = "" }: { className?: string }) {
       <img
         src={logoUrl}
         alt="HisabKitab"
-        className="h-10 w-10 rounded-full object-cover shadow-sm"
+        className="h-10 w-10 rounded-xl object-cover shadow-sm"
       />
       <div className="leading-tight">
         <div className="text-lg font-bold text-emerald-700">HisabKitab</div>
