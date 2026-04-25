@@ -8,6 +8,7 @@ import {
 import {
   initMessaging,
   requestNotificationPermission,
+  showLocalNotification,
 } from "@/firebase/messaging";
 import {
   detectTimezone,
@@ -25,31 +26,50 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setTime(getReminderTime(uid));
     setEnabled(getRemindersEnabled(uid));
     setError(null);
+    setSuccess(null);
   }, [open, uid]);
 
   if (!open) return null;
 
+  const formatTimeLabel = (hhmm: string): string => {
+    const [h, m] = hhmm.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+    const hour12 = ((h + 11) % 12) + 1;
+    const ampm = h < 12 ? "AM" : "PM";
+    return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+
   const handleSave = async () => {
     setError(null);
+    setSuccess(null);
     setSaving(true);
     try {
       if (enabled) {
         const perm = await requestNotificationPermission();
+        if (perm === "unsupported") {
+          setError(
+            "This browser doesn't support web notifications. Try Chrome, Edge, or Firefox.",
+          );
+          setSaving(false);
+          return;
+        }
         if (perm !== "granted") {
           setError(
-            "Please allow notifications in your browser to receive reminders.",
+            "Notifications are blocked. Tap the lock icon in your browser's address bar and allow notifications for this site.",
           );
           setSaving(false);
           return;
         }
         await initMessaging(uid);
       }
+
       setReminderTime(uid, time);
       setRemindersEnabled(uid, enabled);
       try {
@@ -59,9 +79,24 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
           timezone: detectTimezone(),
         });
       } catch {
-        // server-side cloud function settings save failed; local reminders still work
+        // server-side settings save failed; local reminders still work
       }
-      onClose();
+
+      if (enabled) {
+        showLocalNotification(
+          "Reminders are on",
+          `We'll send a daily nudge at ${formatTimeLabel(time)}.`,
+        );
+        setSuccess(
+          `Saved. You'll get a daily reminder at ${formatTimeLabel(time)}, plus alerts when you near or cross your budgets. A test notification should appear now.`,
+        );
+      } else {
+        setSuccess("Reminders turned off.");
+      }
+
+      setTimeout(() => {
+        onClose();
+      }, 1800);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save settings.");
     } finally {
@@ -130,8 +165,20 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
         </div>
 
         {error && (
-          <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">
+          <div
+            className="mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3"
+            data-testid="text-reminder-error"
+          >
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div
+            className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg p-3"
+            data-testid="text-reminder-success"
+          >
+            {success}
           </div>
         )}
 
