@@ -1,5 +1,6 @@
 import { getToken, onMessage } from "firebase/messaging";
 import { getMessagingInstance, VAPID_KEY } from "./config";
+import { saveFcmToken } from "./notifications";
 
 export const requestNotificationPermission = async (): Promise<
   "granted" | "denied" | "default" | "unsupported"
@@ -11,7 +12,7 @@ export const requestNotificationPermission = async (): Promise<
   return result;
 };
 
-export const initMessaging = async (): Promise<string | null> => {
+export const initMessaging = async (uid?: string): Promise<string | null> => {
   if (!VAPID_KEY) return null;
   const messaging = await getMessagingInstance();
   if (!messaging) return null;
@@ -34,6 +35,14 @@ export const initMessaging = async (): Promise<string | null> => {
         new Notification(title, { body });
       }
     });
+
+    if (token && uid) {
+      try {
+        await saveFcmToken(uid, token);
+      } catch {
+        // ignore — token will retry next session
+      }
+    }
 
     return token ?? null;
   } catch {

@@ -163,7 +163,7 @@ export function DashboardPage() {
     }
     setPermission(result);
     if (result === "granted") {
-      await initMessaging();
+      await initMessaging(user?.uid);
       showLocalNotification(
         "Notifications enabled",
         "We'll remind you to log your expenses.",

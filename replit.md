@@ -7,7 +7,10 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ## Artifacts
 
 - **HisabKitab** (`artifacts/hisabkitab`) — React + Vite expense tracker.
-  Frontend-only app using Firebase (Auth + Firestore + Cloud Messaging).
+  Uses Firebase (Auth + Firestore + Cloud Messaging). Optional Cloud
+  Functions in `artifacts/hisabkitab/functions/` for scheduled daily
+  reminder pushes and budget-alert pushes (deployed separately via the
+  Firebase CLI; requires Blaze plan).
   See `artifacts/hisabkitab/SETUP.md` for Firebase connection instructions.
 
 ## Stack

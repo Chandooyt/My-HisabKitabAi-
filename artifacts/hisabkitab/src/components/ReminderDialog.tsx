@@ -5,7 +5,14 @@ import {
   setReminderTime,
   setRemindersEnabled,
 } from "@/lib/notifications";
-import { requestNotificationPermission } from "@/firebase/messaging";
+import {
+  initMessaging,
+  requestNotificationPermission,
+} from "@/firebase/messaging";
+import {
+  detectTimezone,
+  saveNotificationSettings,
+} from "@/firebase/notifications";
 
 type Props = {
   open: boolean;
@@ -41,9 +48,19 @@ export function ReminderDialog({ open, onClose, uid }: Props) {
           setSaving(false);
           return;
         }
+        await initMessaging(uid);
       }
       setReminderTime(uid, time);
       setRemindersEnabled(uid, enabled);
+      try {
+        await saveNotificationSettings(uid, {
+          enabled,
+          reminderTime: time,
+          timezone: detectTimezone(),
+        });
+      } catch {
+        // server-side cloud function settings save failed; local reminders still work
+      }
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save settings.");

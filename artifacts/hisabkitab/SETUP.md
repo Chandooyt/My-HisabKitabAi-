@@ -64,7 +64,54 @@ service cloud.firestore {
 }
 ```
 
-## 6. (Optional) AdSense
+## 6. (Optional) Server-side push notifications via Cloud Functions
+
+The app already shows reminders, budget warnings, and budget-crossed alerts
+when HisabKitab is open in a browser tab. To deliver them as **real push
+notifications even when the app is closed**, deploy the included Cloud
+Functions to your Firebase project.
+
+### Requirements
+
+1. Firebase project must be on the **Blaze (pay-as-you-go) plan** — scheduled
+   functions and FCM at scale require Blaze. Free usage limits still apply
+   and HisabKitab traffic should fit comfortably within them for personal use.
+2. Install the Firebase CLI: `npm install -g firebase-tools`
+3. Log in: `firebase login`
+4. Make sure you completed step 4 above (web push VAPID key).
+
+### Deploy
+
+From the `artifacts/hisabkitab/` directory:
+
+```
+cd functions
+npm install
+cd ..
+firebase use hisabkitab-5db94    # or your own project ID
+firebase deploy --only functions,firestore:rules
+```
+
+This deploys two functions:
+
+- **`dailyReminder`** — runs every 15 minutes; sends each user their daily
+  reminder push at the time they picked (in their own timezone).
+- **`onExpenseCreated`** — runs when a new expense is added; sends push
+  warnings at 80% of the daily / category budget and an alert when crossed.
+
+### How the client connects
+
+When users tap **🔔 Reminders**, enable notifications, and save, the app:
+
+- Stores their FCM web push token under
+  `users/{uid}/settings/notifications.fcmTokens`
+- Stores their reminder preferences (enabled, time, timezone) in the same doc
+- The deployed functions read these and send push messages to those tokens.
+
+Tokens that become invalid (uninstalled / cleared browsers) are pruned
+automatically by the function.
+
+## 7. (Optional) AdSense
 
 The app reserves space for AdSense banners at the top and bottom of the dashboard.
 To activate them:
