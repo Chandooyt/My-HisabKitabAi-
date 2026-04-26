@@ -4,6 +4,11 @@ import { AdBanner } from "@/components/AdBanner";
 import { AddExpenseDialog } from "@/components/AddExpenseDialog";
 import { BudgetDialog } from "@/components/BudgetDialog";
 import { NotificationsDialog } from "@/components/NotificationsDialog";
+import { InsightsCard } from "@/components/InsightsCard";
+import { WeeklySummaryCard } from "@/components/WeeklySummaryCard";
+import { SpendingCharts } from "@/components/SpendingCharts";
+import { StreakBadges } from "@/components/StreakBadges";
+import { AiAssistant } from "@/components/AiAssistant";
 import { useAuth } from "@/firebase/auth";
 import {
   subscribeBudget,
@@ -25,6 +30,14 @@ import {
 } from "@/firebase/messaging";
 import { VAPID_KEY } from "@/firebase/config";
 import { fireOnce } from "@/lib/notifications";
+import {
+  computeInsights,
+  computeStreaks,
+  computeWeeklySummary,
+  categoryTotalsLast7Days,
+  dailyTotalsLast7Days,
+} from "@/lib/insights";
+import { iconFor } from "@/lib/categories";
 
 export function DashboardPage() {
   const { user, logOut } = useAuth();
@@ -84,6 +97,24 @@ export function DashboardPage() {
     if (todayTotal === budget.daily) return "equal" as const;
     return "under" as const;
   }, [budget.daily, todayTotal]);
+
+  const insights = useMemo(
+    () => computeInsights(expenses, budget),
+    [expenses, budget],
+  );
+  const weekly = useMemo(() => computeWeeklySummary(expenses), [expenses]);
+  const streaks = useMemo(
+    () => computeStreaks(expenses, budget),
+    [expenses, budget],
+  );
+  const dailyPoints = useMemo(
+    () => dailyTotalsLast7Days(expenses),
+    [expenses],
+  );
+  const categoryPoints = useMemo(
+    () => categoryTotalsLast7Days(expenses),
+    [expenses],
+  );
 
   useEffect(() => {
     if (!user || permission !== "granted") return;
@@ -145,15 +176,23 @@ export function DashboardPage() {
       await initMessaging(user?.uid);
       showLocalNotification(
         "Notifications enabled",
-        "We'll remind you to log your expenses.",
+        "We'll alert you about your budgets.",
       );
     }
   };
 
   const smartMessage = useMemo(() => {
     if (todayTotal === 0) return "No spending today. Good job!";
-    return `You spent ${formatRupees(todayTotal)} today`;
-  }, [todayTotal]);
+    if (budget.daily) {
+      const left = budget.daily - todayTotal;
+      if (left > 0) {
+        return `You spent ${formatRupees(todayTotal)} today. ${formatRupees(left)} left.`;
+      }
+      if (left === 0) return `You spent ${formatRupees(todayTotal)} — exactly on budget.`;
+      return `You spent ${formatRupees(todayTotal)} — ${formatRupees(-left)} over today's budget.`;
+    }
+    return `You spent ${formatRupees(todayTotal)} today.`;
+  }, [todayTotal, budget.daily]);
 
   return (
     <div className="min-h-screen bg-emerald-50/40">
@@ -247,6 +286,14 @@ export function DashboardPage() {
           </div>
         </section>
 
+        <WeeklySummaryCard summary={weekly} />
+
+        <StreakBadges stats={streaks} hasBudget={Boolean(budget.daily)} />
+
+        <InsightsCard insights={insights} />
+
+        <SpendingCharts daily={dailyPoints} categories={categoryPoints} />
+
         {budget.daily && Object.keys(budget.perCategory).length > 0 && (
           <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 mb-4">
             <p className="text-sm font-semibold text-emerald-700/80 uppercase tracking-wide mb-3">
@@ -265,7 +312,10 @@ export function DashboardPage() {
                     className="flex items-center justify-between text-sm"
                     data-testid={`row-cat-budget-${cat}`}
                   >
-                    <span className="font-medium text-gray-700">{cat}</span>
+                    <span className="font-medium text-gray-700 inline-flex items-center gap-2">
+                      <span aria-hidden>{iconFor(cat)}</span>
+                      {cat}
+                    </span>
                     <span
                       className={
                         over
@@ -314,39 +364,51 @@ export function DashboardPage() {
             </div>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {todayExpenses.map((e) => (
-                <li
-                  key={e.id}
-                  className="py-3 flex items-center justify-between gap-3"
-                  data-testid={`row-expense-${e.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">
-                      {e.category === "Other" && e.customCategory
-                        ? e.customCategory
-                        : e.category}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatDateTime(e.createdAt)}
-                      {e.note ? ` · ${e.note}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-base font-bold text-emerald-700 whitespace-nowrap">
-                      {formatRupees(e.amount)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => user && removeExpense(user.uid, e.id)}
-                      className="text-xs text-gray-400 hover:text-red-600"
-                      aria-label="Delete expense"
-                      data-testid={`button-delete-${e.id}`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </li>
-              ))}
+              {todayExpenses.map((e) => {
+                const label =
+                  e.category === "Other" && e.customCategory
+                    ? e.customCategory
+                    : e.category;
+                return (
+                  <li
+                    key={e.id}
+                    className="py-3 flex items-center justify-between gap-3"
+                    data-testid={`row-expense-${e.id}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center text-base shrink-0"
+                        aria-hidden
+                      >
+                        {iconFor(e.category)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">
+                          {label}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatDateTime(e.createdAt)}
+                          {e.note ? ` · ${e.note}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-base font-bold text-emerald-700 whitespace-nowrap">
+                        {formatRupees(e.amount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => user && removeExpense(user.uid, e.id)}
+                        className="text-xs text-gray-400 hover:text-red-600"
+                        aria-label="Delete expense"
+                        data-testid={`button-delete-${e.id}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -360,28 +422,40 @@ export function DashboardPage() {
               {expenses
                 .filter((e) => !todayExpenses.find((t) => t.id === e.id))
                 .slice(0, 20)
-                .map((e) => (
-                  <li
-                    key={e.id}
-                    className="py-3 flex items-center justify-between gap-3"
-                    data-testid={`row-earlier-${e.id}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">
-                        {e.category === "Other" && e.customCategory
-                          ? e.customCategory
-                          : e.category}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatDateTime(e.createdAt)}
-                        {e.note ? ` · ${e.note}` : ""}
-                      </p>
-                    </div>
-                    <span className="text-base font-bold text-gray-700 whitespace-nowrap">
-                      {formatRupees(e.amount)}
-                    </span>
-                  </li>
-                ))}
+                .map((e) => {
+                  const label =
+                    e.category === "Other" && e.customCategory
+                      ? e.customCategory
+                      : e.category;
+                  return (
+                    <li
+                      key={e.id}
+                      className="py-3 flex items-center justify-between gap-3"
+                      data-testid={`row-earlier-${e.id}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="h-9 w-9 rounded-full bg-gray-50 flex items-center justify-center text-base shrink-0"
+                          aria-hidden
+                        >
+                          {iconFor(e.category)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">
+                            {label}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatDateTime(e.createdAt)}
+                            {e.note ? ` · ${e.note}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-base font-bold text-gray-700 whitespace-nowrap">
+                        {formatRupees(e.amount)}
+                      </span>
+                    </li>
+                  );
+                })}
             </ul>
           </section>
         )}
@@ -427,6 +501,8 @@ export function DashboardPage() {
       >
         +
       </button>
+
+      <AiAssistant expenses={expenses} budget={budget} />
 
       <AddExpenseDialog open={showAdd} onClose={() => setShowAdd(false)} />
       <BudgetDialog
