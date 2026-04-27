@@ -1,522 +1,437 @@
-import { useEffect, useMemo, useState } from "react";
-import { Logo } from "@/components/Logo";
-import { AdBanner } from "@/components/AdBanner";
-import { AddExpenseDialog } from "@/components/AddExpenseDialog";
-import { BudgetDialog } from "@/components/BudgetDialog";
-import { NotificationsDialog } from "@/components/NotificationsDialog";
-import { InsightsCard } from "@/components/InsightsCard";
-import { WeeklySummaryCard } from "@/components/WeeklySummaryCard";
-import { SpendingCharts } from "@/components/SpendingCharts";
-import { StreakBadges } from "@/components/StreakBadges";
-import { AiAssistant } from "@/components/AiAssistant";
-import { useAuth } from "@/firebase/auth";
+import { useMemo } from "react";
 import {
-  subscribeBudget,
-  subscribeExpenses,
-  removeExpense,
-  type Budget,
-  type Expense,
-} from "@/firebase/expenses";
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Line,
+  LineChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
+import type { Budget, Expense } from "@/firebase/expenses";
+import type { NotifLog } from "@/firebase/notificationsLog";
+import { formatRupees, formatDateTime, startOfTodayMs } from "@/lib/format";
+import { iconFor } from "@/lib/categories";
 import {
-  endOfTodayMs,
-  formatDateTime,
-  formatRupees,
-  startOfTodayMs,
-} from "@/lib/format";
-import {
-  initMessaging,
-  requestNotificationPermission,
-  showLocalNotification,
-} from "@/firebase/messaging";
-import { VAPID_KEY } from "@/firebase/config";
-import { fireOnce } from "@/lib/notifications";
-import {
-  computeInsights,
-  computeStreaks,
-  computeWeeklySummary,
   categoryTotalsLast7Days,
   dailyTotalsLast7Days,
 } from "@/lib/insights";
-import { iconFor } from "@/lib/categories";
+import { UpgradeCard } from "@/components/UpgradeCard";
+import type { PageId } from "@/components/Sidebar";
 
-export function DashboardPage() {
-  const { user, logOut } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [budget, setBudget] = useState<Budget>({ daily: null, perCategory: {} });
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [showBudget, setShowBudget] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
-    typeof Notification !== "undefined"
-      ? Notification.permission
-      : "unsupported",
+type Props = {
+  expenses: Expense[];
+  budget: Budget;
+  notifications: NotifLog[];
+  isPremium: boolean;
+  onNavigate: (id: PageId) => void;
+  onAddExpense: () => void;
+};
+
+const PIE_COLORS = ["#10b981", "#34d399", "#6ee7b7", "#fbbf24", "#60a5fa", "#a78bfa"];
+
+const startOfMonthMs = (): number => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  return d.getTime();
+};
+
+const daysInThisMonth = (): number => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+};
+
+const dayOfMonth = (): number => new Date().getDate();
+
+const labelFor = (e: Expense): string =>
+  e.category === "Other" && e.customCategory ? e.customCategory : e.category;
+
+export function DashboardPage({
+  expenses,
+  budget,
+  notifications,
+  isPremium,
+  onNavigate,
+  onAddExpense,
+}: Props) {
+  const monthStart = startOfMonthMs();
+  const todayStart = startOfTodayMs();
+
+  const monthlyExpenses = useMemo(
+    () => expenses.filter((e) => e.createdAt >= monthStart),
+    [expenses, monthStart],
   );
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsubExp = subscribeExpenses(
-      user.uid,
-      (items) => {
-        setExpenses(items);
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      },
-    );
-    const unsubBud = subscribeBudget(
-      user.uid,
-      (b) => setBudget(b),
-      (err) => setError(err.message),
-    );
-    return () => {
-      unsubExp();
-      unsubBud();
-    };
-  }, [user]);
-
-  const todayExpenses = useMemo(() => {
-    const start = startOfTodayMs();
-    const end = endOfTodayMs();
-    return expenses.filter(
-      (e) => e.createdAt >= start && e.createdAt <= end,
-    );
-  }, [expenses]);
-
-  const todayTotal = useMemo(
-    () => todayExpenses.reduce((acc, e) => acc + e.amount, 0),
-    [todayExpenses],
+  const todayExpenses = useMemo(
+    () => expenses.filter((e) => e.createdAt >= todayStart),
+    [expenses, todayStart],
   );
 
-  const budgetStatus = useMemo(() => {
-    if (!budget.daily) return null;
-    if (todayTotal > budget.daily) return "over" as const;
-    if (todayTotal === budget.daily) return "equal" as const;
-    return "under" as const;
-  }, [budget.daily, todayTotal]);
+  const monthTotal = monthlyExpenses.reduce((a, e) => a + e.amount, 0);
+  const todayTotal = todayExpenses.reduce((a, e) => a + e.amount, 0);
+  const dailyAvg = monthTotal / Math.max(1, dayOfMonth());
 
-  const insights = useMemo(
-    () => computeInsights(expenses, budget),
-    [expenses, budget],
-  );
-  const weekly = useMemo(() => computeWeeklySummary(expenses), [expenses]);
-  const streaks = useMemo(
-    () => computeStreaks(expenses, budget),
-    [expenses, budget],
-  );
-  const dailyPoints = useMemo(
-    () => dailyTotalsLast7Days(expenses),
-    [expenses],
-  );
-  const categoryPoints = useMemo(
-    () => categoryTotalsLast7Days(expenses),
-    [expenses],
-  );
+  const monthlyBudget = budget.daily ? budget.daily * daysInThisMonth() : 0;
+  const monthlyUsedPct = monthlyBudget > 0 ? Math.min(100, Math.round((monthTotal / monthlyBudget) * 100)) : 0;
 
-  useEffect(() => {
-    if (!user || permission !== "granted") return;
-    if (!budget.daily) return;
-    const ratio = todayTotal / budget.daily;
-    if (ratio >= 1) {
-      fireOnce(
-        user.uid,
-        "daily-over",
-        "Budget crossed",
-        `You crossed today's budget of ${formatRupees(budget.daily)}. Spent ${formatRupees(todayTotal)}.`,
-      );
-    } else if (ratio >= 0.8) {
-      fireOnce(
-        user.uid,
-        "daily-warn",
-        "Budget warning",
-        `You've used ${Math.round(ratio * 100)}% of today's ${formatRupees(budget.daily)} budget.`,
-      );
-    }
-  }, [user, permission, budget.daily, todayTotal]);
+  const recent = expenses.slice(0, 5);
 
-  useEffect(() => {
-    if (!user || permission !== "granted") return;
-    const cats = Object.entries(budget.perCategory);
-    if (cats.length === 0) return;
-    for (const [cat, limit] of cats) {
-      if (!limit || limit <= 0) continue;
-      const spent = todayExpenses
-        .filter((e) => e.category === cat)
-        .reduce((a, e) => a + e.amount, 0);
-      const ratio = spent / limit;
-      if (ratio >= 1) {
-        fireOnce(
-          user.uid,
-          `cat-over-${cat}`,
-          `${cat} budget crossed`,
-          `Spent ${formatRupees(spent)} on ${cat} (limit ${formatRupees(limit)}).`,
-        );
-      } else if (ratio >= 0.8) {
-        fireOnce(
-          user.uid,
-          `cat-warn-${cat}`,
-          `${cat} nearing limit`,
-          `${Math.round(ratio * 100)}% of your ${cat} budget used (${formatRupees(spent)} of ${formatRupees(limit)}).`,
-        );
-      }
-    }
-  }, [user, permission, budget.perCategory, todayExpenses]);
+  const cats = useMemo(() => categoryTotalsLast7Days(expenses), [expenses]);
+  const totalCats = cats.reduce((a, c) => a + c.total, 0);
+  const pieData = cats.map((c) => ({
+    name: c.name,
+    value: c.total,
+    pct: totalCats > 0 ? Math.round((c.total / totalCats) * 100) : 0,
+  }));
 
-  const askPermission = async () => {
-    const result = await requestNotificationPermission();
-    if (result === "unsupported") {
-      setPermission("unsupported");
-      return;
-    }
-    setPermission(result);
-    if (result === "granted") {
-      await initMessaging(user?.uid);
-      showLocalNotification(
-        "Notifications enabled",
-        "We'll alert you about your budgets.",
-      );
-    }
-  };
+  const dailyTrend = useMemo(() => dailyTotalsLast7Days(expenses), [expenses]);
 
-  const smartMessage = useMemo(() => {
-    if (todayTotal === 0) return "No spending today. Good job!";
-    if (budget.daily) {
-      const left = budget.daily - todayTotal;
-      if (left > 0) {
-        return `You spent ${formatRupees(todayTotal)} today. ${formatRupees(left)} left.`;
-      }
-      if (left === 0) return `You spent ${formatRupees(todayTotal)} — exactly on budget.`;
-      return `You spent ${formatRupees(todayTotal)} — ${formatRupees(-left)} over today's budget.`;
-    }
-    return `You spent ${formatRupees(todayTotal)} today.`;
-  }, [todayTotal, budget.daily]);
+  const recentNotifications = notifications.slice(0, 3);
+  const userGreeting = "Welcome back! Here's your financial overview.";
 
   return (
-    <div className="min-h-screen bg-emerald-50/40">
-      <header className="bg-white border-b border-emerald-100 sticky top-0 z-30">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Logo />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowNotifications(true)}
-              className="text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-2 inline-flex items-center gap-1"
-              data-testid="button-notification-settings"
-              aria-label="Notification settings"
-              title="Notification settings"
-            >
-              <span aria-hidden>🔔</span>
-              <span className="hidden sm:inline">Alerts</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => logOut()}
-              className="text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
-              data-testid="button-logout"
-            >
-              Log out
-            </button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            Dashboard
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">{userGreeting}</p>
         </div>
-      </header>
+        <button
+          type="button"
+          onClick={onAddExpense}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg px-4 py-2.5 text-sm inline-flex items-center gap-2"
+          data-testid="button-add-expense-header"
+        >
+          <span aria-hidden>＋</span> Add Expense
+        </button>
+      </div>
 
-      <main className="max-w-3xl mx-auto px-4 pb-32">
-        <AdBanner placement="top" />
-
-        <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6 mb-4">
-          <p className="text-sm font-semibold text-emerald-700/80 uppercase tracking-wide">
-            Today's spending
-          </p>
-          <div
-            className="mt-2 text-4xl sm:text-5xl font-bold text-emerald-700"
-            data-testid="text-today-total"
-          >
-            {formatRupees(todayTotal)}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              title="Total Expenses"
+              subtitle="This Month"
+              value={formatRupees(monthTotal)}
+              footer="All categories"
+              icon="💵"
+              testid="stat-month-total"
+            />
+            <StatCard
+              title="Today's Expenses"
+              subtitle="Today"
+              value={formatRupees(todayTotal)}
+              footer={`${todayExpenses.length} ${todayExpenses.length === 1 ? "item" : "items"}`}
+              icon="🧾"
+              testid="stat-today"
+            />
+            <StatCard
+              title="This Month Budget"
+              subtitle="Monthly"
+              value={monthlyBudget > 0 ? formatRupees(monthlyBudget) : "—"}
+              footer={monthlyBudget > 0 ? `${monthlyUsedPct}% used` : "Set a daily budget"}
+              icon="🎯"
+              testid="stat-month-budget"
+            />
+            <StatCard
+              title="Daily Average"
+              subtitle="This Month"
+              value={formatRupees(Math.round(dailyAvg))}
+              footer="Per day"
+              icon="📈"
+              testid="stat-daily-avg"
+            />
           </div>
-          <p className="mt-3 text-base text-gray-700" data-testid="text-smart-message">
-            {smartMessage}
-          </p>
 
-          <div className="mt-5">
-            {budget.daily ? (
-              <div
-                className={`rounded-xl p-4 text-base font-semibold ${
-                  budgetStatus === "over"
-                    ? "bg-red-50 text-red-700 border border-red-100"
-                    : budgetStatus === "equal"
-                      ? "bg-amber-50 text-amber-700 border border-amber-100"
-                      : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                }`}
-                data-testid="text-budget-status"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card title="Recent Expenses" right={
+              <button
+                type="button"
+                onClick={() => onNavigate("expenses")}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
               >
-                {budgetStatus === "over" &&
-                  `You crossed your budget. Limit ${formatRupees(budget.daily)}.`}
-                {budgetStatus === "equal" &&
-                  `You reached your budget of ${formatRupees(budget.daily)}.`}
-                {budgetStatus === "under" &&
-                  `You are under your budget of ${formatRupees(budget.daily)}.`}
-              </div>
-            ) : (
-              <div className="rounded-xl p-4 bg-gray-50 border border-gray-100 text-sm text-gray-600">
-                Set a daily budget to see spending alerts.
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setShowAdd(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-lg py-3 shadow-sm"
-              data-testid="button-add-expense"
-            >
-              + Add expense
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowBudget(true)}
-              className="bg-white hover:bg-emerald-50 text-emerald-700 font-semibold rounded-lg py-3 border border-emerald-200"
-              data-testid="button-set-budget"
-            >
-              Set budget
-            </button>
-          </div>
-        </section>
-
-        <WeeklySummaryCard summary={weekly} />
-
-        <StreakBadges stats={streaks} hasBudget={Boolean(budget.daily)} />
-
-        <InsightsCard insights={insights} />
-
-        <SpendingCharts daily={dailyPoints} categories={categoryPoints} />
-
-        {budget.daily && Object.keys(budget.perCategory).length > 0 && (
-          <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 mb-4">
-            <p className="text-sm font-semibold text-emerald-700/80 uppercase tracking-wide mb-3">
-              Category limits today
-            </p>
-            <ul className="space-y-2">
-              {Object.entries(budget.perCategory).map(([cat, limit]) => {
-                const spent = todayExpenses
-                  .filter((e) => e.category === cat)
-                  .reduce((a, e) => a + e.amount, 0);
-                const over = spent > limit;
-                const equal = spent === limit;
-                return (
-                  <li
-                    key={cat}
-                    className="flex items-center justify-between text-sm"
-                    data-testid={`row-cat-budget-${cat}`}
-                  >
-                    <span className="font-medium text-gray-700 inline-flex items-center gap-2">
-                      <span aria-hidden>{iconFor(cat)}</span>
-                      {cat}
-                    </span>
-                    <span
-                      className={
-                        over
-                          ? "text-red-700 font-semibold"
-                          : equal
-                            ? "text-amber-700 font-semibold"
-                            : "text-emerald-700 font-semibold"
-                      }
-                    >
-                      {formatRupees(spent)} / {formatRupees(limit)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-
-        <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-emerald-700/80 uppercase tracking-wide">
-              Today's expenses
-            </p>
-            <span className="text-xs text-gray-500" data-testid="text-count">
-              {todayExpenses.length}{" "}
-              {todayExpenses.length === 1 ? "item" : "items"}
-            </span>
-          </div>
-
-          {loading ? (
-            <p className="text-gray-500 text-sm py-6 text-center">Loading...</p>
-          ) : error ? (
-            <p
-              className="text-red-600 text-sm py-6 text-center"
-              data-testid="text-list-error"
-            >
-              {error}
-            </p>
-          ) : todayExpenses.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="text-4xl mb-2">💰</div>
-              <p className="text-gray-700 font-medium">Nothing logged yet</p>
-              <p className="text-gray-500 text-sm">
-                Tap "+ Add expense" to start tracking.
-              </p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {todayExpenses.map((e) => {
-                const label =
-                  e.category === "Other" && e.customCategory
-                    ? e.customCategory
-                    : e.category;
-                return (
-                  <li
-                    key={e.id}
-                    className="py-3 flex items-center justify-between gap-3"
-                    data-testid={`row-expense-${e.id}`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center text-base shrink-0"
-                        aria-hidden
-                      >
-                        {iconFor(e.category)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">
-                          {label}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatDateTime(e.createdAt)}
-                          {e.note ? ` · ${e.note}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-base font-bold text-emerald-700 whitespace-nowrap">
-                        {formatRupees(e.amount)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => user && removeExpense(user.uid, e.id)}
-                        className="text-xs text-gray-400 hover:text-red-600"
-                        aria-label="Delete expense"
-                        data-testid={`button-delete-${e.id}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        {expenses.length > todayExpenses.length && (
-          <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 mt-4">
-            <p className="text-sm font-semibold text-emerald-700/80 uppercase tracking-wide mb-3">
-              Earlier
-            </p>
-            <ul className="divide-y divide-gray-100">
-              {expenses
-                .filter((e) => !todayExpenses.find((t) => t.id === e.id))
-                .slice(0, 20)
-                .map((e) => {
-                  const label =
-                    e.category === "Other" && e.customCategory
-                      ? e.customCategory
-                      : e.category;
-                  return (
+                View All
+              </button>
+            }>
+              {recent.length === 0 ? (
+                <p className="text-sm text-gray-500 py-8 text-center">
+                  No expenses yet. Tap "Add Expense" to start.
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {recent.map((e) => (
                     <li
                       key={e.id}
-                      className="py-3 flex items-center justify-between gap-3"
-                      data-testid={`row-earlier-${e.id}`}
+                      className="py-2.5 flex items-center justify-between gap-3"
+                      data-testid={`row-recent-${e.id}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className="h-9 w-9 rounded-full bg-gray-50 flex items-center justify-center text-base shrink-0"
-                          aria-hidden
-                        >
+                        <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center text-base shrink-0">
                           {iconFor(e.category)}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">
-                            {label}
+                          <p className="font-semibold text-gray-900 text-sm truncate">
+                            {labelFor(e)}
                           </p>
                           <p className="text-xs text-gray-500">
                             {formatDateTime(e.createdAt)}
-                            {e.note ? ` · ${e.note}` : ""}
                           </p>
                         </div>
                       </div>
-                      <span className="text-base font-bold text-gray-700 whitespace-nowrap">
+                      <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
                         {formatRupees(e.amount)}
                       </span>
                     </li>
-                  );
-                })}
-            </ul>
-          </section>
-        )}
-
-        {permission === "default" && (
-          <section className="bg-emerald-600 text-white rounded-2xl shadow-sm p-5 mt-4">
-            <p className="font-semibold">Turn on budget alerts</p>
-            <p className="text-sm text-emerald-50 mt-1">
-              Get a warning when you reach 80% of a budget and an alert when
-              you cross it — for both your daily limit and any category limits.
-              {!VAPID_KEY && (
-                <>
-                  {" "}
-                  <span className="block mt-1 text-emerald-100/90 text-xs">
-                    Tip: add a VAPID key in your .env to also enable Firebase
-                    Cloud Messaging from a server.
-                  </span>
-                </>
+                  ))}
+                </ul>
               )}
-            </p>
-            <div className="mt-3">
+            </Card>
+
+            <Card title="Top Categories">
+              {pieData.length === 0 ? (
+                <p className="text-sm text-gray-500 py-8 text-center">
+                  Log expenses to see category breakdown.
+                </p>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="h-44 w-44 shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={42}
+                          outerRadius={70}
+                          paddingAngle={2}
+                          stroke="none"
+                        >
+                          {pieData.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) => formatRupees(v)}
+                          contentStyle={{
+                            borderRadius: 8,
+                            border: "1px solid #d1fae5",
+                            fontSize: 12,
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="flex-1 space-y-1.5 min-w-0">
+                    {pieData.slice(0, 5).map((p, i) => (
+                      <li
+                        key={p.name}
+                        className="flex items-center justify-between text-xs gap-2"
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                          />
+                          <span className="truncate text-gray-700 font-medium">
+                            {p.name}
+                          </span>
+                        </span>
+                        <span className="text-gray-600 font-semibold shrink-0">
+                          {p.pct}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <Card title="Expense Trend" subtitle="Last 7 days">
+            <div className="h-56 -ml-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={dailyTrend}
+                  margin={{ top: 5, right: 12, bottom: 0, left: 0 }}
+                >
+                  <CartesianGrid stroke="#f3f4f6" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#9ca3af"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    width={48}
+                    tickFormatter={(v) =>
+                      v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`
+                    }
+                  />
+                  <Tooltip
+                    formatter={(v: number) => formatRupees(v)}
+                    contentStyle={{
+                      borderRadius: 8,
+                      border: "1px solid #d1fae5",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="total"
+                    stroke="#059669"
+                    strokeWidth={2.5}
+                    dot={{ fill: "#059669", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        <aside className="space-y-6">
+          <Card
+            title="Notifications"
+            right={
               <button
                 type="button"
-                onClick={askPermission}
-                className="bg-white text-emerald-700 font-semibold rounded-lg px-4 py-2"
-                data-testid="button-enable-notifications-card"
+                onClick={() => onNavigate("notifications")}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
               >
-                Enable
+                View All
               </button>
+            }
+          >
+            {recentNotifications.length === 0 ? (
+              <p className="text-sm text-gray-500 py-6 text-center">
+                You're all caught up.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {recentNotifications.map((n) => (
+                  <li
+                    key={n.id}
+                    className="flex items-start gap-3"
+                    data-testid={`notif-preview-${n.id}`}
+                  >
+                    <div
+                      className={`h-8 w-8 rounded-full flex items-center justify-center text-sm shrink-0 ${
+                        n.read
+                          ? "bg-gray-100 text-gray-500"
+                          : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {n.kind.includes("over") ? "⚠️" : n.kind.includes("warn") ? "🔔" : "✓"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {n.title}
+                      </p>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        {n.body}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onNavigate("notifications")}
+                className="mt-4 w-full text-sm font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-50 rounded-lg py-2"
+              >
+                Go to Notifications
+              </button>
+            )}
+          </Card>
+
+          {!isPremium && <UpgradeCard onUpgrade={() => onNavigate("plans")} />}
+          {isPremium && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">
+              <div className="h-10 w-10 mx-auto rounded-full bg-amber-500 text-white flex items-center justify-center text-lg">
+                👑
+              </div>
+              <p className="mt-2 font-bold text-amber-800">You're on Premium</p>
+              <p className="text-xs text-amber-700/80 mt-1">
+                All features unlocked. Thank you!
+              </p>
             </div>
-          </section>
-        )}
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
 
-        <AdBanner placement="bottom" />
-      </main>
+function StatCard({
+  title,
+  subtitle,
+  value,
+  footer,
+  icon,
+  testid,
+}: {
+  title: string;
+  subtitle: string;
+  value: string;
+  footer: string;
+  icon: string;
+  testid: string;
+}) {
+  return (
+    <div
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
+      data-testid={testid}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-gray-500">{title}</p>
+          <p className="text-[11px] text-gray-400">{subtitle}</p>
+        </div>
+        <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center text-base shrink-0">
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-xl font-bold text-gray-900 truncate">{value}</p>
+      <p className="text-xs text-gray-500 mt-1">{footer}</p>
+    </div>
+  );
+}
 
-      <button
-        type="button"
-        onClick={() => setShowAdd(true)}
-        className="sm:hidden fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-emerald-600 text-white text-3xl shadow-lg flex items-center justify-center"
-        aria-label="Add expense"
-        data-testid="button-fab-add"
-      >
-        +
-      </button>
-
-      <AiAssistant expenses={expenses} budget={budget} />
-
-      <AddExpenseDialog open={showAdd} onClose={() => setShowAdd(false)} />
-      <BudgetDialog
-        open={showBudget}
-        onClose={() => setShowBudget(false)}
-        current={budget}
-      />
-      {user && (
-        <NotificationsDialog
-          open={showNotifications}
-          onClose={() => setShowNotifications(false)}
-          uid={user.uid}
-        />
-      )}
+function Card({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+          {subtitle && (
+            <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+          )}
+        </div>
+        {right}
+      </div>
+      {children}
     </div>
   );
 }

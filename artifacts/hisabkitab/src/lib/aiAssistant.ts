@@ -1,7 +1,6 @@
 import type { Expense, Budget } from "@/firebase/expenses";
 import {
   computeInsights,
-  computeStreaks,
   computeWeeklySummary,
   categoryTotalsLast7Days,
 } from "./insights";
@@ -23,30 +22,15 @@ const intentMatchers: Array<{
     intent: "save",
     patterns: [/save\b/i, /reduce\b/i, /cut down/i, /spend less/i],
   },
-  {
-    intent: "waste",
-    patterns: [/wast/i, /leak/i, /unnecessary/i, /useless/i],
-  },
+  { intent: "waste", patterns: [/wast/i, /leak/i, /unnecessary/i, /useless/i] },
   {
     intent: "analyze",
     patterns: [/analy[sz]e/i, /report/i, /summary/i, /overview/i, /how am i/i],
   },
-  {
-    intent: "category",
-    patterns: [/categor/i, /top/i, /highest/i, /most/i],
-  },
-  {
-    intent: "today",
-    patterns: [/today/i, /now\b/i],
-  },
-  {
-    intent: "week",
-    patterns: [/week/i, /7 days/i],
-  },
-  {
-    intent: "budget",
-    patterns: [/budget/i, /limit/i, /target/i],
-  },
+  { intent: "category", patterns: [/categor/i, /top/i, /highest/i, /most/i] },
+  { intent: "today", patterns: [/today/i, /now\b/i] },
+  { intent: "week", patterns: [/week/i, /7 days/i] },
+  { intent: "budget", patterns: [/budget/i, /limit/i, /target/i] },
   {
     intent: "greet",
     patterns: [/^(hi|hey|hello|salam|assalam|kaise|how are)/i],
@@ -89,7 +73,6 @@ export const generateAiReply = (
   const intent = detectIntent(userText);
   const insights = computeInsights(expenses, budget);
   const week = computeWeeklySummary(expenses);
-  const streaks = computeStreaks(expenses, budget);
   const cats = categoryTotalsLast7Days(expenses);
   const top = cats[0];
   const totalWeek = cats.reduce((a, c) => a + c.total, 0);
@@ -98,42 +81,48 @@ export const generateAiReply = (
 
   switch (intent) {
     case "greet":
-      lines.push("Salam! I'm your HisabKitab assistant.");
+      lines.push("Salam! I'm your HisabKitab AI assistant.");
       lines.push(
         week.thisWeekTotal > 0
           ? `This week you've spent ${formatRupees(week.thisWeekTotal)}.`
           : "You haven't logged any spending this week yet.",
       );
-      lines.push("Ask me things like 'where am I wasting money' or 'how can I save?'");
+      lines.push(
+        "Ask me things like 'where am I wasting money' or 'how can I save?'",
+      );
       break;
 
     case "save":
       lines.push("Here's how you can save this week:");
       if (top && totalWeek > 0) {
         const share = Math.round((top.total / totalWeek) * 100);
-        lines.push(`• ${top.name} is ${share}% of your spending. ${tipsForCategory(top.name)}`);
+        lines.push(
+          `• ${top.name} is ${share}% of your spending. ${tipsForCategory(top.name)}`,
+        );
       }
       if (budget.daily) {
         lines.push(`• Stick to your daily budget of ${formatRupees(budget.daily)}.`);
       } else {
         lines.push("• Set a daily budget to give yourself a clear target.");
       }
-      if (streaks.savedThisWeek > 0) {
-        lines.push(
-          `• You're already on track — saved ${formatRupees(streaks.savedThisWeek)} this week vs your daily target.`,
-        );
-      }
+      lines.push(
+        "• Log every expense — even small ones add up across the month.",
+      );
       break;
 
     case "waste":
       if (!top) {
         lines.push("Log a few more expenses and I can spot leaks for you.");
       } else {
-        lines.push(`Your biggest spending is on ${top.name} (${formatRupees(top.total)} this week).`);
+        lines.push(
+          `Your biggest spending is on ${top.name} (${formatRupees(top.total)} this week).`,
+        );
         lines.push(tipsForCategory(top.name));
         const second = cats[1];
         if (second) {
-          lines.push(`Next biggest is ${second.name} (${formatRupees(second.total)}).`);
+          lines.push(
+            `Next biggest is ${second.name} (${formatRupees(second.total)}).`,
+          );
         }
       }
       break;
@@ -147,7 +136,9 @@ export const generateAiReply = (
           if (week.diffPct > 0) {
             lines.push(`That's ${week.diffPct}% more than last week.`);
           } else if (week.diffPct < 0) {
-            lines.push(`That's ${Math.abs(week.diffPct)}% less than last week. Well done!`);
+            lines.push(
+              `That's ${Math.abs(week.diffPct)}% less than last week. Well done!`,
+            );
           } else {
             lines.push("That's about the same as last week.");
           }
@@ -203,32 +194,23 @@ export const generateAiReply = (
             : `Down ${Math.abs(week.diffPct)}% vs last week — keep it up!`,
         );
       }
-      if (streaks.underBudgetStreak > 0) {
-        lines.push(`🔥 ${streaks.underBudgetStreak}-day under-budget streak!`);
-      }
       break;
 
     case "budget":
       if (!budget.daily) {
-        lines.push("You haven't set a daily budget yet. Tap 'Set budget' to add one.");
+        lines.push(
+          "You haven't set a daily budget yet. Open the Budget page to add one.",
+        );
       } else {
         lines.push(`Your daily budget is ${formatRupees(budget.daily)}.`);
-        if (streaks.underBudgetStreak > 0) {
-          lines.push(`You've stayed under it for ${streaks.underBudgetStreak} days running.`);
-        }
-        if (streaks.savedThisWeek > 0) {
-          lines.push(`Saved roughly ${formatRupees(streaks.savedThisWeek)} this week.`);
-        }
       }
       break;
 
     default:
       lines.push("Here's a quick look at your money:");
       if (week.thisWeekTotal > 0) lines.push(week.message);
-      if (top) lines.push(`Biggest category: ${top.name} (${formatRupees(top.total)}).`);
-      if (streaks.underBudgetStreak >= 2) {
-        lines.push(`🔥 ${streaks.underBudgetStreak}-day under-budget streak.`);
-      }
+      if (top)
+        lines.push(`Biggest category: ${top.name} (${formatRupees(top.total)}).`);
       lines.push(
         "Try asking: 'where am I wasting money?', 'analyze my spending', or 'how can I save?'",
       );

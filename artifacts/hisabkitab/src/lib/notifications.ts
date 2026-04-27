@@ -1,4 +1,5 @@
 import { showLocalNotification } from "@/firebase/messaging";
+import { recordNotification } from "@/firebase/notificationsLog";
 
 const todayKey = () => {
   const d = new Date();
@@ -30,4 +31,5 @@ export const fireOnce = (
   if (wasAlerted(uid, kind)) return;
   markAlerted(uid, kind);
   showLocalNotification(title, body);
+  void recordNotification(uid, { title, body, kind });
 };
