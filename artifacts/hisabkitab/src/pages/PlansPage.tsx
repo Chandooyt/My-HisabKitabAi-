@@ -48,12 +48,19 @@ export function PlansPage({ isPremium }: Props) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
+        <div
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs sm:text-sm font-bold rounded-full px-4 py-1.5 shadow-md animate-pulse"
+          data-testid="banner-50-off"
+        >
+          <span aria-hidden>🔥</span>
+          50% OFF — Limited Time Offer
+        </div>
+        <h1 className="mt-3 text-3xl sm:text-4xl font-bold text-gray-900">
           Choose your plan
         </h1>
         <p className="text-sm text-gray-500 mt-2 max-w-xl mx-auto">
-          Start free and upgrade anytime to unlock the AI Assistant and advanced
-          analytics.
+          Start free and unlock everything with a one-time payment. No monthly
+          fees. No subscriptions. Pay once, use forever.
         </p>
       </div>
 
@@ -101,7 +108,7 @@ export function PlansPage({ isPremium }: Props) {
           <p className="text-sm text-gray-500 mt-1">For getting started</p>
           <p className="mt-4 text-3xl font-bold text-gray-900">
             Rs 0
-            <span className="text-sm font-medium text-gray-500"> / month</span>
+            <span className="text-sm font-medium text-gray-500"> forever</span>
           </p>
           <ul className="mt-5 space-y-2.5">
             {FREE_FEATURES.map((f) => (
@@ -145,10 +152,25 @@ export function PlansPage({ isPremium }: Props) {
           <p className="text-sm text-emerald-100 mt-1">
             For serious money management
           </p>
-          <p className="mt-4 text-3xl font-bold">
-            Rs 499
-            <span className="text-sm font-medium text-emerald-100"> / month</span>
-          </p>
+          <div className="mt-4">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-4xl font-extrabold" data-testid="text-price-now">
+                Rs 299
+              </span>
+              <span
+                className="text-lg font-semibold text-emerald-200/80 line-through decoration-2"
+                data-testid="text-price-old"
+              >
+                Rs 599
+              </span>
+              <span className="text-[10px] font-bold bg-amber-400 text-amber-900 rounded-full px-2 py-1">
+                SAVE 50%
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-emerald-100">
+              One-time payment · Lifetime access
+            </p>
+          </div>
           <ul className="mt-5 space-y-2.5">
             {PREMIUM_FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-2 text-sm">
@@ -182,10 +204,15 @@ export function PlansPage({ isPremium }: Props) {
         </div>
       </div>
 
-      <p className="text-xs text-center text-gray-400 max-w-md mx-auto">
-        Demo: clicking "Upgrade" toggles your plan instantly. Connect a payment
-        provider to charge real money.
-      </p>
+      <div className="text-center space-y-1 max-w-md mx-auto">
+        <p className="text-sm font-semibold text-gray-700">
+          ⏳ Limited time offer — price goes back to Rs 599 soon.
+        </p>
+        <p className="text-xs text-gray-400">
+          Demo: clicking "Upgrade" toggles your plan instantly. Connect a
+          payment provider to charge real money.
+        </p>
+      </div>
     </div>
   );
 }
