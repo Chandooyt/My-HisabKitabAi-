@@ -11,7 +11,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import type { Budget, Expense } from "@/firebase/expenses";
+import type { Expense } from "@/firebase/expenses";
 import type { NotifLog } from "@/firebase/notificationsLog";
 import { formatRupees, formatDateTime, startOfTodayMs } from "@/lib/format";
 import { iconFor } from "@/lib/categories";
@@ -24,60 +24,52 @@ import type { PageId } from "@/components/Sidebar";
 
 type Props = {
   expenses: Expense[];
-  budget: Budget;
+  monthlyTotal: number;
   notifications: NotifLog[];
   isPremium: boolean;
   onNavigate: (id: PageId) => void;
   onAddExpense: () => void;
+  onResetMonth: () => void | Promise<void>;
 };
 
 const PIE_COLORS = ["#10b981", "#34d399", "#6ee7b7", "#fbbf24", "#60a5fa", "#a78bfa"];
 
-const startOfMonthMs = (): number => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(1);
-  return d.getTime();
-};
-
-const daysInThisMonth = (): number => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-};
-
-const dayOfMonth = (): number => new Date().getDate();
-
 const labelFor = (e: Expense): string =>
   e.category === "Other" && e.customCategory ? e.customCategory : e.category;
 
+const monthName = (): string =>
+  new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
+
 export function DashboardPage({
   expenses,
-  budget,
+  monthlyTotal,
   notifications,
   isPremium,
   onNavigate,
   onAddExpense,
+  onResetMonth,
 }: Props) {
-  const monthStart = startOfMonthMs();
   const todayStart = startOfTodayMs();
 
-  const monthlyExpenses = useMemo(
-    () => expenses.filter((e) => e.createdAt >= monthStart),
-    [expenses, monthStart],
-  );
   const todayExpenses = useMemo(
     () => expenses.filter((e) => e.createdAt >= todayStart),
     [expenses, todayStart],
   );
 
-  const monthTotal = monthlyExpenses.reduce((a, e) => a + e.amount, 0);
   const todayTotal = todayExpenses.reduce((a, e) => a + e.amount, 0);
-  const dailyAvg = monthTotal / Math.max(1, dayOfMonth());
-
-  const monthlyBudget = budget.daily ? budget.daily * daysInThisMonth() : 0;
-  const monthlyUsedPct = monthlyBudget > 0 ? Math.min(100, Math.round((monthTotal / monthlyBudget) * 100)) : 0;
 
   const recent = expenses.slice(0, 5);
+
+  const handleResetMonth = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.confirm(
+        `Reset all expenses for ${monthName()}?\n\nThis will set your "Total Expenses (This Month)" back to Rs 0. Your individual expense history is NOT deleted. Use this when the month is over to start fresh.`,
+      )
+    ) {
+      void onResetMonth();
+    }
+  };
 
   const cats = useMemo(() => categoryTotalsLast7Days(expenses), [expenses]);
   const totalCats = cats.reduce((a, c) => a + c.total, 0);
@@ -113,39 +105,39 @@ export function DashboardPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard
-              title="Total Expenses"
-              subtitle="This Month"
-              value={formatRupees(monthTotal)}
-              footer="All categories"
-              icon="💵"
-              testid="stat-month-total"
-            />
-            <StatCard
-              title="Today's Expenses"
-              subtitle="Today"
-              value={formatRupees(todayTotal)}
-              footer={`${todayExpenses.length} ${todayExpenses.length === 1 ? "item" : "items"}`}
-              icon="🧾"
-              testid="stat-today"
-            />
-            <StatCard
-              title="This Month Budget"
-              subtitle="Monthly"
-              value={monthlyBudget > 0 ? formatRupees(monthlyBudget) : "—"}
-              footer={monthlyBudget > 0 ? `${monthlyUsedPct}% used` : "Set a daily budget"}
-              icon="🎯"
-              testid="stat-month-budget"
-            />
-            <StatCard
-              title="Daily Average"
-              subtitle="This Month"
-              value={formatRupees(Math.round(dailyAvg))}
-              footer="Per day"
-              icon="📈"
-              testid="stat-daily-avg"
-            />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                {monthName()} overview
+              </p>
+              <button
+                type="button"
+                onClick={handleResetMonth}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1"
+                data-testid="button-reset-month"
+                title="Clear this month's total — use when the month is over"
+              >
+                <span aria-hidden>🗑️</span> Reset Month Expense
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <StatCard
+                title="Total Expenses"
+                subtitle="This Month"
+                value={formatRupees(monthlyTotal)}
+                footer="Cumulative — only resets when you tap Reset"
+                icon="💵"
+                testid="stat-month-total"
+              />
+              <StatCard
+                title="Today's Expenses"
+                subtitle="Today"
+                value={formatRupees(todayTotal)}
+                footer={`${todayExpenses.length} ${todayExpenses.length === 1 ? "item" : "items"}`}
+                icon="🧾"
+                testid="stat-today"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

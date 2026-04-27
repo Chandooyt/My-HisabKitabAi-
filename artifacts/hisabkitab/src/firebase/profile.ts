@@ -14,9 +14,10 @@ export type Profile = {
   paymentRequestedAt?: number | null;
   paymentMethod?: string | null;
   paymentReference?: string | null;
+  monthlyTotal: number;
 };
 
-const profileDoc = (uid: string) =>
+export const profileDoc = (uid: string) =>
   doc(getDbInstance(), "users", uid, "profile", "main");
 
 export const subscribeProfile = (
@@ -35,6 +36,7 @@ export const subscribeProfile = (
         paymentRequestedAt?: { toMillis?: () => number } | number | null;
         paymentMethod?: string | null;
         paymentReference?: string | null;
+        monthlyTotal?: number;
       };
       const toMs = (v: { toMillis?: () => number } | number | null | undefined): number | null => {
         if (v && typeof v === "object" && typeof v.toMillis === "function") {
@@ -51,6 +53,10 @@ export const subscribeProfile = (
         paymentRequestedAt: toMs(data.paymentRequestedAt),
         paymentMethod: data.paymentMethod ?? null,
         paymentReference: data.paymentReference ?? null,
+        monthlyTotal:
+          typeof data.monthlyTotal === "number" && data.monthlyTotal > 0
+            ? data.monthlyTotal
+            : 0,
       });
     },
     (err) => {
@@ -91,6 +97,14 @@ export const requestPayment = async (
       paymentReference: data.reference ?? null,
       updatedAt: serverTimestamp(),
     },
+    { merge: true },
+  );
+};
+
+export const resetMonthlyTotal = async (uid: string) => {
+  await setDoc(
+    profileDoc(uid),
+    { monthlyTotal: 0, updatedAt: serverTimestamp() },
     { merge: true },
   );
 };

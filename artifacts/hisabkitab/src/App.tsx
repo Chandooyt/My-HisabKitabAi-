@@ -22,7 +22,11 @@ import {
   type Budget,
   type Expense,
 } from "@/firebase/expenses";
-import { subscribeProfile, type Profile } from "@/firebase/profile";
+import {
+  resetMonthlyTotal,
+  subscribeProfile,
+  type Profile,
+} from "@/firebase/profile";
 import {
   subscribeNotifications,
   type NotifLog,
@@ -46,6 +50,7 @@ function AuthedShell() {
     paymentRequestedAt: null,
     paymentMethod: null,
     paymentReference: null,
+    monthlyTotal: 0,
   });
   const [notifications, setNotifications] = useState<NotifLog[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -138,11 +143,14 @@ function AuthedShell() {
       pageContent = (
         <DashboardPage
           expenses={expenses}
-          budget={budget}
+          monthlyTotal={profile.monthlyTotal}
           notifications={notifications}
           isPremium={profile.isPremium}
           onNavigate={setPage}
           onAddExpense={() => setShowAdd(true)}
+          onResetMonth={async () => {
+            if (user) await resetMonthlyTotal(user.uid);
+          }}
         />
       );
       break;

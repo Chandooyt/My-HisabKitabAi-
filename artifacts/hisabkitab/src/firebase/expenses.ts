@@ -1,16 +1,18 @@
 import {
   collection,
-  addDoc,
   deleteDoc,
   doc,
+  increment,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   getDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { getDbInstance } from "./config";
+import { profileDoc } from "./profile";
 
 export type Expense = {
   id: string;
@@ -82,13 +84,25 @@ export const addExpense = async (
     note?: string | null;
   },
 ) => {
-  await addDoc(userExpensesCol(uid), {
+  const db = getDbInstance();
+  const batch = writeBatch(db);
+  const newExpenseRef = doc(userExpensesCol(uid));
+  batch.set(newExpenseRef, {
     amount: data.amount,
     category: data.category,
     customCategory: data.customCategory ?? null,
     note: data.note ?? null,
     createdAt: serverTimestamp(),
   });
+  batch.set(
+    profileDoc(uid),
+    {
+      monthlyTotal: increment(data.amount),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+  await batch.commit();
 };
 
 export const removeExpense = async (uid: string, id: string) => {
