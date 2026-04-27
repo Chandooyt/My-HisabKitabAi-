@@ -10,6 +10,10 @@ export type Profile = {
   isPremium: boolean;
   displayName?: string | null;
   premiumSince?: number | null;
+  paymentRequested: boolean;
+  paymentRequestedAt?: number | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
 };
 
 const profileDoc = (uid: string) =>
@@ -27,18 +31,26 @@ export const subscribeProfile = (
         isPremium?: boolean;
         displayName?: string | null;
         premiumSince?: { toMillis?: () => number } | number | null;
+        paymentRequested?: boolean;
+        paymentRequestedAt?: { toMillis?: () => number } | number | null;
+        paymentMethod?: string | null;
+        paymentReference?: string | null;
       };
-      let premiumSince: number | null = null;
-      const ps = data.premiumSince;
-      if (ps && typeof ps === "object" && typeof ps.toMillis === "function") {
-        premiumSince = ps.toMillis();
-      } else if (typeof ps === "number") {
-        premiumSince = ps;
-      }
+      const toMs = (v: { toMillis?: () => number } | number | null | undefined): number | null => {
+        if (v && typeof v === "object" && typeof v.toMillis === "function") {
+          return v.toMillis();
+        }
+        if (typeof v === "number") return v;
+        return null;
+      };
       cb({
         isPremium: Boolean(data.isPremium),
         displayName: data.displayName ?? null,
-        premiumSince,
+        premiumSince: toMs(data.premiumSince),
+        paymentRequested: Boolean(data.paymentRequested),
+        paymentRequestedAt: toMs(data.paymentRequestedAt),
+        paymentMethod: data.paymentMethod ?? null,
+        paymentReference: data.paymentReference ?? null,
       });
     },
     (err) => {
@@ -62,6 +74,35 @@ export const setDisplayName = async (uid: string, displayName: string) => {
   await setDoc(
     profileDoc(uid),
     { displayName, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+};
+
+export const requestPayment = async (
+  uid: string,
+  data: { method: string; reference?: string },
+) => {
+  await setDoc(
+    profileDoc(uid),
+    {
+      paymentRequested: true,
+      paymentRequestedAt: serverTimestamp(),
+      paymentMethod: data.method,
+      paymentReference: data.reference ?? null,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+};
+
+export const cancelPaymentRequest = async (uid: string) => {
+  await setDoc(
+    profileDoc(uid),
+    {
+      paymentRequested: false,
+      paymentRequestedAt: null,
+      updatedAt: serverTimestamp(),
+    },
     { merge: true },
   );
 };

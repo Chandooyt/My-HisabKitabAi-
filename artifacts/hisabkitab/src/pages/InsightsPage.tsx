@@ -84,7 +84,7 @@ export function InsightsPage({ expenses, budget, isPremium, onNavigate }: Props)
             </div>
             <button
               type="button"
-              onClick={() => onNavigate("plans")}
+              onClick={() => onNavigate("payment")}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-4 py-2 whitespace-nowrap"
             >
               Upgrade
@@ -180,7 +180,7 @@ export function InsightsPage({ expenses, budget, isPremium, onNavigate }: Props)
         <PremiumLock
           title="Weekly summary & advanced charts"
           description="See this week vs last week, top category trends, and detailed bar charts. Available on Premium."
-          onUpgrade={() => onNavigate("plans")}
+          onUpgrade={() => onNavigate("payment")}
         />
       )}
     </div>

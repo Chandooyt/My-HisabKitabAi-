@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { useAuth } from "@/firebase/auth";
-import { setPremium } from "@/firebase/profile";
+import type { PageId } from "@/components/Sidebar";
 
-type Props = { isPremium: boolean };
+type Props = { isPremium: boolean; onNavigate: (id: PageId) => void };
 
 const FREE_FEATURES = [
   "Basic expense tracking",
@@ -21,29 +19,8 @@ const PREMIUM_FEATURES = [
   "Priority support",
 ];
 
-export function PlansPage({ isPremium }: Props) {
-  const { user } = useAuth();
-  const [busy, setBusy] = useState(false);
-
-  const upgrade = async () => {
-    if (!user) return;
-    setBusy(true);
-    try {
-      await setPremium(user.uid, true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const downgrade = async () => {
-    if (!user) return;
-    setBusy(true);
-    try {
-      await setPremium(user.uid, false);
-    } finally {
-      setBusy(false);
-    }
-  };
+export function PlansPage({ isPremium, onNavigate }: Props) {
+  const upgrade = () => onNavigate("payment");
 
   return (
     <div className="space-y-6">
@@ -78,15 +55,6 @@ export function PlansPage({ isPremium }: Props) {
               All features are unlocked. Thank you for your support!
             </p>
           </div>
-          <button
-            type="button"
-            onClick={downgrade}
-            disabled={busy}
-            className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
-            data-testid="button-downgrade"
-          >
-            Switch to Free
-          </button>
         </div>
       )}
 
@@ -193,12 +161,10 @@ export function PlansPage({ isPremium }: Props) {
             <button
               type="button"
               onClick={upgrade}
-              disabled={busy}
               className="mt-6 w-full bg-white hover:bg-emerald-50 text-emerald-700 font-bold rounded-lg py-2.5 inline-flex items-center justify-center gap-2"
               data-testid="button-upgrade-plan"
             >
-              <span aria-hidden>👑</span>
-              {busy ? "Upgrading..." : "Upgrade to Premium"}
+              <span aria-hidden>👑</span> Upgrade to Premium
             </button>
           )}
         </div>
@@ -209,8 +175,8 @@ export function PlansPage({ isPremium }: Props) {
           ⏳ Limited time offer — price goes back to Rs 599 soon.
         </p>
         <p className="text-xs text-gray-400">
-          Demo: clicking "Upgrade" toggles your plan instantly. Connect a
-          payment provider to charge real money.
+          Manual payment via JazzCash / Easypaisa. Your account is unlocked
+          after our team verifies your transfer.
         </p>
       </div>
     </div>

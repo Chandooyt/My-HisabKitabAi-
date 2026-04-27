@@ -9,6 +9,7 @@ import { BudgetPage } from "@/pages/BudgetPage";
 import { InsightsPage } from "@/pages/InsightsPage";
 import { AssistantPage } from "@/pages/AssistantPage";
 import { PlansPage } from "@/pages/PlansPage";
+import { PaymentPage } from "@/pages/PaymentPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { Layout } from "@/components/Layout";
@@ -41,6 +42,10 @@ function AuthedShell() {
     isPremium: false,
     displayName: null,
     premiumSince: null,
+    paymentRequested: false,
+    paymentRequestedAt: null,
+    paymentMethod: null,
+    paymentReference: null,
   });
   const [notifications, setNotifications] = useState<NotifLog[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -173,7 +178,12 @@ function AuthedShell() {
       );
       break;
     case "plans":
-      pageContent = <PlansPage isPremium={profile.isPremium} />;
+      pageContent = (
+        <PlansPage isPremium={profile.isPremium} onNavigate={setPage} />
+      );
+      break;
+    case "payment":
+      pageContent = <PaymentPage profile={profile} onNavigate={setPage} />;
       break;
     case "notifications":
       pageContent = (

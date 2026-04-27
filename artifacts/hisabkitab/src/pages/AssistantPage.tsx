@@ -51,7 +51,7 @@ export function AssistantPage({ expenses, budget, isPremium, onNavigate }: Props
         <PremiumLock
           title="AI Assistant is a Premium feature"
           description="Get personal money advice in chat: 'where am I wasting money?', 'how can I save?', 'analyze my spending'. Upgrade to unlock it."
-          onUpgrade={() => onNavigate("plans")}
+          onUpgrade={() => onNavigate("payment")}
         />
       </div>
     );

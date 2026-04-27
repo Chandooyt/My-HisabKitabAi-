@@ -8,6 +8,7 @@ export type PageId =
   | "insights"
   | "assistant"
   | "plans"
+  | "payment"
   | "notifications"
   | "settings";
 
@@ -111,7 +112,7 @@ export function Sidebar({ active, onNavigate, isPremium, open, onClose }: Props)
               </p>
               <button
                 type="button"
-                onClick={() => click("plans")}
+                onClick={() => click("payment")}
                 className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg py-2 inline-flex items-center justify-center gap-1"
                 data-testid="button-sidebar-upgrade"
               >

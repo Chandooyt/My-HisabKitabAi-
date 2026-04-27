@@ -356,7 +356,7 @@ export function DashboardPage({
             )}
           </Card>
 
-          {!isPremium && <UpgradeCard onUpgrade={() => onNavigate("plans")} />}
+          {!isPremium && <UpgradeCard onUpgrade={() => onNavigate("payment")} />}
           {isPremium && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">
               <div className="h-10 w-10 mx-auto rounded-full bg-amber-500 text-white flex items-center justify-center text-lg">
