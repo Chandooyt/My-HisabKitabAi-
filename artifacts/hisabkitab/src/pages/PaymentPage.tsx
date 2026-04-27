@@ -243,7 +243,7 @@ export function PaymentPage({ profile, onNavigate }: Props) {
               <p className="text-xs text-gray-600 mt-1">
                 Account title:{" "}
                 <span className="font-semibold text-gray-800">
-                  HisabKitab AI Team
+                  Muhammad Zahoor
                 </span>{" "}
                 (Easypaisa)
               </p>
