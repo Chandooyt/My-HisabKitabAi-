@@ -204,7 +204,7 @@ export function PaymentPage({ profile, onNavigate }: Props) {
           >
             <div className="flex items-center justify-between">
               <span className="font-bold text-emerald-700">Easypaisa</span>
-              <span className="text-xl">💚</span>
+              <span className="text-xl">🟢</span>
             </div>
             <p className="text-xs text-gray-500 mt-1">Direct transfer</p>
           </button>
@@ -220,7 +220,7 @@ export function PaymentPage({ profile, onNavigate }: Props) {
           >
             <div className="flex items-center justify-between">
               <span className="font-bold text-red-700">JazzCash</span>
-              <span className="text-xl">❤️</span>
+              <span className="text-xl">🔴</span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Send from Jazz to Easypaisa
