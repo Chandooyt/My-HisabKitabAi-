@@ -156,7 +156,11 @@ function AuthedShell() {
       break;
     case "expenses":
       pageContent = (
-        <ExpensesPage expenses={expenses} onAdd={() => setShowAdd(true)} />
+        <ExpensesPage
+          expenses={expenses}
+          isPremium={profile.isPremium}
+          onAdd={() => setShowAdd(true)}
+        />
       );
       break;
     case "categories":
