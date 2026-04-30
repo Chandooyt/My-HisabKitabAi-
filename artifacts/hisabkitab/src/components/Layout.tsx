@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Sidebar, type PageId } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
+import { AdSlot } from "@/components/AdSlot";
 
 type Props = {
   active: PageId;
@@ -37,6 +38,11 @@ export function Layout({
         <main className="flex-1 px-4 sm:px-6 py-6 max-w-screen-2xl w-full mx-auto">
           {children}
         </main>
+        {!isPremium && (
+          <footer className="px-4 sm:px-6 pb-6 max-w-screen-2xl w-full mx-auto">
+            <AdSlot slot="2850967188" isPremium={isPremium} />
+          </footer>
+        )}
       </div>
     </div>
   );
