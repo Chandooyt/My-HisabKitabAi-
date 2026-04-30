@@ -20,6 +20,7 @@ import {
   dailyTotalsLast7Days,
 } from "@/lib/insights";
 import { UpgradeCard } from "@/components/UpgradeCard";
+import { AdSlot } from "@/components/AdSlot";
 import type { PageId } from "@/components/Sidebar";
 
 type Props = {
@@ -102,6 +103,8 @@ export function DashboardPage({
           <span aria-hidden>＋</span> Add Expense
         </button>
       </div>
+
+      <AdSlot slot="7037624203" isPremium={isPremium} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
