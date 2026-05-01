@@ -1,0 +1,13 @@
+uploads = []
+
+[[generated]]
+id = "NXrRCcqPZ-w80eltX5h33"
+uri = "file://artifacts/hisabkitab/public/og-image.png"
+type = "image"
+title = "hisabkitab og banner"
+
+[[outputs]]
+id = "HutsP7aJ8n7uSqVM7eJZj"
+uri = "file://artifacts/hisabkitab/public/og-image.png"
+type = "image"
+title = "HisabKitab AI — OG Share Image"
