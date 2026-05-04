@@ -8,12 +8,10 @@ const FREE_FEATURES = [
   "Basic dashboard",
   "Limited insights (top 2)",
   "Push notifications for budgets",
-  "Shows ads",
 ];
 
 const PREMIUM_FEATURES = [
   "Everything in Free",
-  "100% Ad-free experience",
   "AI Assistant chat",
   "Full smart insights",
   "Weekly summary & comparisons",
