@@ -1,4 +1,4 @@
-import logoUrl from "@assets/file_00000000b318720d88cde69c6949d785_1777290548573.png";
+const logoUrl = "/logo.png";
 
 type Props = {
   className?: string;
