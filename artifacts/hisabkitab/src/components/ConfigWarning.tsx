@@ -1,4 +1,4 @@
-import logoUrl from "@assets/file_0000000036647208be29fa4d970126e5_1777136350500.png";
+const logoUrl = "/logo.png";
 
 export function ConfigWarning() {
   return (
